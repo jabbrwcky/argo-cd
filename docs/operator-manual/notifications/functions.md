@@ -129,7 +129,9 @@ Example:
 <hr>
 **`repo.GetCommitMetadata(sha string) CommitMetadata`**
 
-Returns commit metadata. The commit must belong to the application source repository. `CommitMetadata` fields:
+Returns commit metadata. The commit must belong to one of the application's Git sources. For a
+multi-source application, each Git source is tried in order; Helm and OCI sources are skipped.
+`CommitMetadata` fields:
 
 * `Message string` commit message
 * `Author string` - commit author

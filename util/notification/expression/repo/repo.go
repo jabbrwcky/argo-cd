@@ -47,26 +47,34 @@ func getAppDetails(un *unstructured.Unstructured, argocdService service.Service)
 }
 
 func getCommitMetadata(commitSHA string, app *unstructured.Unstructured, argocdService service.Service) (*shared.CommitMetadata, error) {
-	repoURL, ok, err := unstructured.NestedString(app.Object, "spec", "source", "repoURL")
+	application, err := getApplication(app)
 	if err != nil {
 		return nil, err
 	}
-	if !ok {
+
+	// The commit belongs to one of the git sources; Helm and OCI sources have no commits.
+	var repoURLs []string
+	for _, source := range application.Spec.GetSources() {
+		if source.RepoURL != "" && !source.IsHelm() && !source.IsOCI() {
+			repoURLs = append(repoURLs, source.RepoURL)
+		}
+	}
+	if len(repoURLs) == 0 {
 		panic(errors.New("failed to get application source repo URL"))
 	}
-	project, ok, err := unstructured.NestedString(app.Object, "spec", "project")
-	if err != nil {
-		return nil, err
-	}
-	if !ok {
+	if application.Spec.Project == "" {
 		panic(errors.New("failed to get application project"))
 	}
 
-	meta, err := argocdService.GetCommitMetadata(context.Background(), repoURL, commitSHA, project)
-	if err != nil {
-		return nil, err
+	var lastErr error
+	for _, repoURL := range repoURLs {
+		meta, err := argocdService.GetCommitMetadata(context.Background(), repoURL, commitSHA, application.Spec.Project)
+		if err == nil {
+			return meta, nil
+		}
+		lastErr = err
 	}
-	return meta, nil
+	return nil, lastErr
 }
 
 func FullNameByRepoURL(rawURL string) string {
